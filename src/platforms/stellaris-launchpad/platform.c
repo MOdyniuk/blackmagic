@@ -1,22 +1,9 @@
-#include <inc/hw_types.h>
-#include <inc/hw_memmap.h>
-#include <inc/hw_ints.h>
-
-#include <driverlib/gpio.h>
-#include <driverlib/rom.h>
-#include <driverlib/rom_map.h>
-#include <driverlib/pin_map.h>
-#include <driverlib/sysctl.h>
-#include <driverlib/systick.h>
-#include <driverlib/uart.h>
-#include <driverlib/interrupt.h>
-
-#include <utils/uartstdio.h>
-#include <utils/ustdlib.h>
-
 #include "platform.h"
 
-#define CPU_FREQ	(48000000)
+#include <libopencm3/lm4f/rcc.h>
+#include <libopencm3/lm4f/nvic.h>
+#include <libopencm3/lm4f/uart.h>
+#include <libopencm3/cm3/systick.h>
 
 #define SYSTICKHZ	10
 #define SYSTICKMS	(1000 / SYSTICKHZ)
@@ -105,11 +92,7 @@ static void morse_update(void)
 void sys_tick_handler(void)
 {
 	if(running_status) {
-		if( MAP_GPIOPinRead(LED_PORT, LED_IDLE_RUN) > 0 ) {
-			MAP_GPIOPinWrite(LED_PORT, LED_IDLE_RUN, 0);
-		} else {
-			MAP_GPIOPinWrite(LED_PORT, LED_IDLE_RUN, LED_IDLE_RUN);
-		}
+		gpio_toggle(LED_PORT, LED_IDLE_RUN);
 	}
 
 	if(timeout_counter)
@@ -118,22 +101,42 @@ void sys_tick_handler(void)
 	morse_update();
 }
 
-void uart0_isr(void)
-{
-	UARTStdioIntHandler();
-}
 
 static void
 uart_init(void)
 {
-        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+	periph_clock_enable(RCC_GPIOA);
+	periph_clock_enable(RCC_UART0);
 
-        // Configure PD0 and PD1 for UART
-        MAP_GPIOPinConfigure(GPIO_PA0_U0RX);
-        MAP_GPIOPinConfigure(GPIO_PA1_U0TX);
-        MAP_GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
-        UARTStdioInitExpClk(0, 115200);
+	// Three cycles delay
+	__asm__("nop"); __asm__("nop"); __asm__("nop");
+
+	gpio_set_af(GPIOA_APB_BASE, 0x1, GPIO0 | GPIO1);
+	gpio_mode_setup(GPIOA_APB_BASE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);
+	gpio_mode_setup(GPIOA_APB_BASE, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);
+
+	uart_disable(UART0);
+
+	uart_clock_from_sysclk(UART0);
+	uart_set_baudrate(UART0, 115200);
+	uart_set_databits(UART0, 8);
+	uart_set_stopbits(UART0, 1);
+	uart_set_parity(UART0, UART_PARITY_NONE);
+
+	// Enable FIFO
+	UART_LCRH(UART0) |= UART_LCRH_FEN;
+
+	// Set FIFO levels to 1/8 of both RX and TX
+	UART_IFLS(UART0) = 0;
+
+	uart_clear_interrupt_flag(UART0, UART_INT_RX | UART_INT_RT);
+	uart_clear_interrupt_flag(UART0, UART_INT_TX);
+
+	uart_enable_interrupts(UART0, UART_INT_RX| UART_INT_RT);
+	uart_enable_interrupts(UART0, UART_INT_TX);
+	uart_enable(UART0);
 }
+
 
 int
 platform_init(void)
@@ -141,40 +144,38 @@ platform_init(void)
         int i;
         for(i=0; i<1000000; i++);
 
-        // Setup for 16MHZ external crystal, use 200MHz PLL and divide by 4 = 50MHz
-        MAP_SysCtlClockSet(SYSCTL_SYSDIV_16 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN |
-                SYSCTL_XTAL_16MHZ);
+	rcc_sysclk_config(OSCSRC_MOSC, XTAL_16M, 16);
 	
 	uart_init();
 
 	// Enable LED
-        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-	MAP_GPIOPinTypeGPIOOutput(LED_PORT, LED_IDLE_RUN);
-	MAP_GPIOPinTypeGPIOOutput(LED_PORT, LED_ERROR);
+	periph_clock_enable(RCC_GPIOF);
+	gpio_mode_setup(LED_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, LED_IDLE_RUN);
+	gpio_set_output_config(LED_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, LED_IDLE_RUN);
+	gpio_mode_setup(LED_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, LED_ERROR);
+	gpio_set_output_config(LED_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, LED_ERROR);
 
 	// Enable all JTAG ports and set pins to output
-        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
-        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
-        MAP_SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+	periph_clock_enable(RCC_GPIOA);
+	periph_clock_enable(RCC_GPIOB);
+	periph_clock_enable(RCC_GPIOE);
 
-	MAP_GPIOPinTypeGPIOOutput(TMS_PORT, TMS_PIN);
-	MAP_GPIOPinTypeGPIOOutput(TCK_PORT, TCK_PIN);
-	MAP_GPIOPinTypeGPIOOutput(TDI_PORT, TDI_PIN);
-	MAP_GPIOPinTypeGPIOOutput(TDO_PORT, TDO_PIN);
-	MAP_GPIOPinTypeGPIOOutput(TRST_PORT, TRST_PIN);
-	MAP_GPIOPinTypeGPIOOutput(SRST_PORT, SRST_PIN);
+	gpio_mode_setup(TMS_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TMS_PIN);
+	gpio_mode_setup(TCK_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TCK_PIN);
+	gpio_mode_setup(TDI_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TDI_PIN);
+	gpio_mode_setup(TDO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TDO_PIN);
+	gpio_mode_setup(TRST_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TRST_PIN);
+	gpio_mode_setup(SRST_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, SRST_PIN);
 
-	//UARTprintf("Initializing systick\r\n");
-	/*char s[] = "Initializing systick\n";
-	UARTwrite(s, strlen(s));*/
-	UARTEchoSet(false);
-	UARTFlushTx(false);
+	systick_set_reload( rcc_get_system_clock_frequency() / SYSTICKHZ);
 
-	MAP_SysTickPeriodSet(MAP_SysCtlClockGet() / SYSTICKHZ);
-	MAP_SysTickEnable();
-	MAP_SysTickIntEnable();
+	systick_interrupt_enable();
+	systick_counter_enable();
 
-	MAP_IntMasterEnable();
+	nvic_enable_irq(NVIC_SYSTICK_IRQ);
+	nvic_enable_irq(NVIC_UART0_IRQ);
+
+	gdb_if_init();
 
 	return 0;
 }
@@ -187,23 +188,5 @@ void platform_delay(uint32_t delay)
 
 const char *platform_target_voltage(void)
 {
-	return "0.0V";
-}
-
-void
-gpio_set_val(uint32_t port, uint8_t pin, uint8_t val)
-{
-	if(val)
-		MAP_GPIOPinWrite(port, pin, pin); 
-	else 
-		MAP_GPIOPinWrite(port, pin, 0);
-}
-
-uint8_t
-gpio_get(uint32_t port, uint8_t pin)
-{
-	if( MAP_GPIOPinRead(port, pin) > 0)
-		return 1;
-	else
-		return 0;
+	return "not supported";
 }

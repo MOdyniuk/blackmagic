@@ -6,12 +6,7 @@
 #include <setjmp.h>
 #include <alloca.h>
 
-#include <inc/hw_types.h>
-#include <inc/hw_memmap.h>
-
-#include <driverlib/rom.h>
-#include <driverlib/rom_map.h>
-#include <driverlib/gpio.h>
+#include <libopencm3/lm4f/gpio.h>
 
 #include "gdb_packet.h"
 
@@ -20,21 +15,21 @@ extern uint8_t running_status;
 extern const char *morse_msg;
 extern volatile uint32_t timeout_counter;
 
-#define LED_PORT	GPIO_PORTF_BASE
-#define LED_IDLE_RUN	GPIO_PIN_2
-#define LED_ERROR	GPIO_PIN_3
+#define LED_PORT	GPIOF_APB_BASE
+#define LED_IDLE_RUN	GPIO2
+#define LED_ERROR	GPIO3
 
-#define TMS_PORT	GPIO_PORTB_BASE
-#define TMS_PIN		GPIO_PIN_5
+#define TMS_PORT	GPIOB_APB_BASE
+#define TMS_PIN		GPIO5
 
-#define TCK_PORT	GPIO_PORTB_BASE
-#define TCK_PIN		GPIO_PIN_0
+#define TCK_PORT	GPIOB_APB_BASE
+#define TCK_PIN		GPIO0
 
-#define TDI_PORT	GPIO_PORTB_BASE
-#define TDI_PIN		GPIO_PIN_1
+#define TDI_PORT	GPIOB_APB_BASE
+#define TDI_PIN		GPIO1
 
-#define TDO_PORT	GPIO_PORTE_BASE
-#define TDO_PIN		GPIO_PIN_4
+#define TDO_PORT	GPIOE_APB_BASE
+#define TDO_PIN		GPIO4
 
 #define SWDIO_PORT	TMS_PORT
 #define SWDIO_PIN	TMS_PIN
@@ -42,24 +37,29 @@ extern volatile uint32_t timeout_counter;
 #define SWCLK_PORT	TCK_PORT
 #define SWCLK_PIN	TCK_PIN
 
-#define TRST_PORT	GPIO_PORTA_BASE
-#define TRST_PIN	GPIO_PIN_5
+#define TRST_PORT	GPIOA_APB_BASE
+#define TRST_PIN	GPIO5
 
-#define SRST_PORT	GPIO_PORTA_BASE
-#define SRST_PIN	GPIO_PIN_6
+#define SRST_PORT	GPIOA_APB_BASE
+#define SRST_PIN	GPIO6
 
 #define TMS_SET_MODE()	{								\
-	MAP_GPIODirModeSet(TMS_PORT, TMS_PIN, GPIO_DIR_MODE_OUT);			\
-	MAP_GPIOPadConfigSet(TMS_PORT, TMS_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);	\
+	gpio_mode_setup(TMS_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TMS_PIN);		\
+	gpio_set_output_config(TMS_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, TMS_PIN);	\
+	/*MAP_GPIODirModeSet(TMS_PORT, TMS_PIN, GPIO_DIR_MODE_OUT);			\
+	MAP_GPIOPadConfigSet(TMS_PORT, TMS_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);*/	\
 }
 
 #define SWDIO_MODE_FLOAT() {								\
-	MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_IN);			\
+	gpio_mode_setup(SWDIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, SWDIO_PIN);	\
+	/*MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_IN);*/			\
 }
 
 #define SWDIO_MODE_DRIVE() {									\
-	MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_OUT);				\
-	MAP_GPIOPadConfigSet(SWDIO_PORT, SWDIO_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);	\
+	gpio_mode_setup(SWDIO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, SWDIO_PIN);		\
+	gpio_set_output_config(SWDIO_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, SWDIO_PIN);		\
+	/*MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_OUT);				\
+	MAP_GPIOPadConfigSet(SWDIO_PORT, SWDIO_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);*/	\
 }
 
 /* Use newlib provided integer only stdio functions */
@@ -71,7 +71,7 @@ extern volatile uint32_t timeout_counter;
 
 #define SET_RUN_STATE(state)	{running_status = (state);}
 #define SET_IDLE_STATE(state)	{gpio_set_val(LED_PORT, LED_IDLE_RUN, state);}
-#define SET_ERROR_STATE(state)	{if(state) MAP_GPIOPinWrite(LED_PORT, LED_ERROR, LED_ERROR); else MAP_GPIOPinWrite(LED_PORT, LED_ERROR, 0);}
+#define SET_ERROR_STATE(state)	{gpio_set_val(LED_PORT, LED_ERROR, state);}
 
 #define PLATFORM_SET_FATAL_ERROR_RECOVERY()	{setjmp(fatal_error_jmpbuf);}
 #define PLATFORM_FATAL_ERROR(error) {			\
@@ -86,9 +86,13 @@ extern volatile uint32_t timeout_counter;
 int platform_init(void);
 void morse(const char *msg, char repeat);
 
-void gpio_set_val(uint32_t port, uint8_t pin, uint8_t val);
+inline static void gpio_set_val(uint32_t port, uint8_t pin, uint8_t val) {
+	gpio_write(port, pin, val == 0 ? 0 : 0xff);
+}
 
-uint8_t gpio_get(uint32_t port, uint8_t pin);
+inline static uint8_t gpio_get(uint32_t port, uint8_t pin) {
+	return !(gpio_read(port, pin) == 0);
+}
 
 void platform_delay(uint32_t delay);
 
