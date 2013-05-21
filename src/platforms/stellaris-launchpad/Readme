@@ -1,0 +1,21 @@
+Blackmagic for the Texas Instruments Stellaris Launchpad Board
+==============================================================
+
+This allows the Stellaris Launchpad to be loaded with the BMP
+firmware. Currently, UART0 on the LM4F is used, which is connected
+to the on-board debugger module that exports it via USB as a CDC ACM
+serial device.
+
+Pinout
+======
+
+JTAG TMS / SWD IO  - PB5
+JTAG TCK / SWD CLK - PB0
+JTAG TDI           - PB1
+JTAG TDO           - PE4
+TRST               - PA5
+SRST               - PA6
+
+IDLE LED           - PF2 / Blue LED
+ERROR LED          - PF3 / Green LED
+
