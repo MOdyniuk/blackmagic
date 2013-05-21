@@ -30,7 +30,6 @@ void uart0_isr(void)
 {
 	uint32_t clear_irq = 0;
 
-	gpio_toggle(LED_PORT, LED_ERROR);
 	if( uart_is_interrupt_source(UART0, UART_INT_RX) || uart_is_interrupt_source(UART0, UART_INT_RT) ) {
 		while( !(UART_FR(UART0) & UART_FR_RXFE) ) {
 			uint8_t ch = uart_recv(UART0);
