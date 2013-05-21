@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "gdb_if.h"
 
 #include <libopencm3/lm4f/rcc.h>
 #include <libopencm3/lm4f/nvic.h>
