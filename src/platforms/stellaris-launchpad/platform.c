@@ -125,10 +125,11 @@ uart_init(void)
 	uart_set_parity(UART0, UART_PARITY_NONE);
 
 	// Enable FIFO
-	UART_LCRH(UART0) |= UART_LCRH_FEN;
+	uart_enable_fifo(UART0);
 
-	// Set FIFO levels to 1/8 of both RX and TX
-	UART_IFLS(UART0) = 0;
+	// Set FIFO interrupt trigger levels to 1/8 full for RX buffer and
+	// 7/8 empty (1/8 full) for TX buffer
+	uart_set_fifo_trigger_levels(UART0, UART_FIFO_RX_TRIG_1_8, UART_FIFO_TX_TRIG_7_8);
 
 	uart_clear_interrupt_flag(UART0, UART_INT_RX | UART_INT_RT);
 	uart_clear_interrupt_flag(UART0, UART_INT_TX);
