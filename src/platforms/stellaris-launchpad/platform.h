@@ -46,20 +46,15 @@ extern volatile uint32_t timeout_counter;
 #define TMS_SET_MODE()	{								\
 	gpio_mode_setup(TMS_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, TMS_PIN);		\
 	gpio_set_output_config(TMS_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, TMS_PIN);	\
-	/*MAP_GPIODirModeSet(TMS_PORT, TMS_PIN, GPIO_DIR_MODE_OUT);			\
-	MAP_GPIOPadConfigSet(TMS_PORT, TMS_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);*/	\
 }
 
 #define SWDIO_MODE_FLOAT() {								\
 	gpio_mode_setup(SWDIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, SWDIO_PIN);	\
-	/*MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_IN);*/			\
 }
 
 #define SWDIO_MODE_DRIVE() {									\
 	gpio_mode_setup(SWDIO_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, SWDIO_PIN);		\
 	gpio_set_output_config(SWDIO_PORT, GPIO_OTYPE_PP, GPIO_DRIVE_2MA, SWDIO_PIN);		\
-	/*MAP_GPIODirModeSet(SWDIO_PORT, SWDIO_PIN, GPIO_DIR_MODE_OUT);				\
-	MAP_GPIOPadConfigSet(SWDIO_PORT, SWDIO_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);*/	\
 }
 
 /* Use newlib provided integer only stdio functions */
