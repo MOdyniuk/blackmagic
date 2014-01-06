@@ -18,7 +18,7 @@ static uint8_t uartTxUsed;
 static void uart_transmit(void)
 {
 	uart_disable_interrupts(UART0, UART_INT_TX);
-	while( !(UART_FR(UART0) & UART_FR_TXFF) && uartTxUsed > 0) {
+	while( !uart_is_tx_fifo_full(UART0) && uartTxUsed > 0) {
 		uartTxUsed--;
 		uart_send(UART0, uartTxBuf[uartTxRead]);
 		uartTxRead = (uartTxRead + 1) % UART_TX_BUF_SIZE;
@@ -31,7 +31,7 @@ void uart0_isr(void)
 	uint32_t clear_irq = 0;
 
 	if( uart_is_interrupt_source(UART0, UART_INT_RX) || uart_is_interrupt_source(UART0, UART_INT_RT) ) {
-		while( !(UART_FR(UART0) & UART_FR_RXFE) ) {
+		while( !uart_is_rx_fifo_empty(UART0) ) {
 			uint8_t ch = uart_recv(UART0);
 			if( uartRxUsed < UART_RX_BUF_SIZE) {
 				uartRxBuf[uartRxWrite] = ch;
